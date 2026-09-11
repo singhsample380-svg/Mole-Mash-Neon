@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mole Mash NEON - Whack & Glow!</title>
+<style>
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    touch-action: manipulation;
+  }
+
+  body {
+    font-family: 'Comic Sans MS', 'Chalkboard SE', sans-serif;
+    background: linear-gradient(135deg, #FF00CC 0%, #7B2FFF 45%, #00E5FF 100%);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  body.shake {
+    animation: screenshake 0.25s ease;
+  }
+
+  @keyframes screenshake {
+    0%, 100% { transform: translate(0, 0); }
+    25% { transform: translate(-5px, 3px); }
+    50% { transform: translate(5px, -3px); }
+    75% { transform: translate(-3px, -4px); }
+  }
+
+  h1 {
+    color: #fff;
+    font-size: clamp(28px, 7vw, 46px);
+    text-align: center;
+    margin-bottom: 4px;
+    text-shadow: 0 0 10px #fff, 0 0 22px #FF00CC, 0 0 36px #7B2FFF;
+  }
+
+  .subtitle {
+    color: #FFF9C4;
+    font-size: clamp(13px, 3vw, 16px);
+    margin-bottom: 14px;
+    text-align: center;
+    text-shadow: 0 0 6px #FFD700;
+  }
+
+  .hud {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 460px;
+    z-index: 2;
+  }
+
+  .hud-box {
+    background: rgba(15, 5, 40, 0.75);
+    border: 2px solid #00E5FF;
+    border-radius: 16px;
+    padding: 8px 16px;
+    font-size: clamp(13px, 2.8vw, 17px);
+    font-weight: bold;
+    color: #00E5FF;
+    box-shadow: 0 0 10px #00E5FF;
+    min-width: 70px;
+    text-align: center;
+    text-shadow: 0 0 6px #00E5FF;
+  }
+
+  .combo-box {
+    color: #FF4D8D;
+    border-color: #FF4D8D;
+    box-shadow: 0 0 10px #FF4D8D;
+    text-shadow: 0 0 6px #FF4D8D;
+    transition: transform 0.15s ease;
+  }
+
+  .combo-box.pulse {
+    transform: scale(1.25);
+  }
+
+  .mute-btn {
+    background: rgba(15, 5, 40, 0.75);
+    border: 2px solid #FFD700;
+    border-radius: 16px;
+    padding: 8px 14px;
+    font-size: clamp(13px, 2.8vw, 17px);
+    cursor: pointer;
+    color: #FFD700;
+  }
+
+  .level-bar-container {
+    width: 100%;
+    max-width: 420px;
+    background: rgba(0,0,0,0.4);
+    border: 2px solid #FFD700;
+    border-radius: 10px;
+    height: 12px;
+    margin-bottom: 16px;
+    overflow: hidden;
+    z-index: 2;
+  }
+
+  .level-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #FFD700, #FF8C00);
+    width: 0%;
+    transition: width 0.3s ease;
+  }
+
+  .board {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    max-width: 380px;
+    width: 100%;
+    z-index: 2;
+  }
+
+  .hole {
+    aspect-ratio: 1 / 1;
+    background: radial-gradient(circle at 50% 65%, #2D1B4E 0%, #12081F 75%);
+    border: 3px solid #7B2FFF;
+    border-radius: 50%;
+    position: relative;
+    box-shadow: inset 0 8px 16px rgba(0,0,0,0.7), 0 0 10px rgba(123,47,255,0.6);
+    cursor: pointer;
+  }
+
+  .hole.up {
+    box-shadow: inset 0 8px 16px rgba(0,0,0,0.7), 0 0 20px #00E5FF;
+  }
+
+  .critter {
+    position: absolute;
+    left: 50%;
+    bottom: -100%;
+    transform: translateX(-50%);
+    font-size: clamp(34px, 9vw, 50px);
+    transition: bottom 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+    pointer-events: none;
+    filter: drop-shadow(0 0 8px #fff);
+    will-change: bottom;
+  }
+
+  .hole.up .critter {
+    bottom: 8%;
+  }
+
+  .hole.hit .critter {
+    animation: hit-anim 0.3s ease forwards;
+  }
+
+  @keyframes hit-anim {
+    0% { transform: translateX(-50%) scale(1); }
+    40% { transform: translateX(-50%) scale(1.5) rotate(20deg); }
+    100% { transform: translateX(-50%) scale(0) rotate(0deg); }
+  }
+
+  .burst {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    animation: burst-fly 0.4s ease-out forwards;
+    will-change: transform, opacity;
+  }
+
+  @keyframes burst-fly {
+    to {
+      transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0.2);
+      opacity: 0;
+    }
+  }
+
+  .score-pop {
+    position: absolute;
+    top: 10%;
+    left: 50%;
+    transform: translateX(-50%);
+    font-weight: bold;
+    font-size: 22px;
+    animation: pop-float 0.6s ease forwards;
+    pointer-events: none;
+    z-index: 10;
+    will-change: transform, opacity;
+  }
+
+  @keyframes pop-float {
+    0% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+    100% { opacity: 0; transform: translateX(-50%) translateY(-40px) scale(1.2); }
+  }
+
+  .start-screen, .end-screen {
+    background: rgba(15, 5, 40, 0.92);
+    border: 3px solid #00E5FF;
+    border-radius: 24px;
+    padding: 30px 26px;
+    text-align: center;
+    max-width: 340px;
+    box-shadow: 0 0 24px #00E5FF;
+    z-index: 3;
+  }
+
+  .start-screen h2, .end-screen h2 {
+    color: #FFD700;
+    font-size: clamp(22px, 5vw, 30px);
+    margin-bottom: 10px;
+    text-shadow: 0 0 10px #FFD700;
+  }
+
+  .start-screen p, .end-screen p {
+    color: #E0E0FF;
+    margin-bottom: 18px;
+    font-size: clamp(14px, 3vw, 17px);
+    line-height: 1.5;
+  }
+
+  button {
+    font-family: inherit;
+    font-size: clamp(17px, 3.2vw, 21px);
+    font-weight: bold;
+    padding: 13px 32px;
+    border-radius: 30px;
+    border: none;
+    background: linear-gradient(135deg, #FF00CC, #7B2FFF);
+    color: #fff;
+    cursor: pointer;
+    box-shadow: 0 0 16px #FF00CC;
+    transition: transform 0.15s ease;
+  }
+
+  button:active { transform: scale(0.94); }
+
+  .hidden { display: none !important; }
+
+  .confetti {
+    position: fixed;
+    top: -20px;
+    font-size: 26px;
+    animation: fall linear forwards;
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  @keyframes fall {
+    to { transform: translateY(110vh) rotate(360deg); opacity: 0.3; }
+  }
+
+  .sparkle-layer {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  .sparkle {
+    position: absolute;
+    font-size: 14px;
+    opacity: 0.5;
+    animation: twinkle 2.4s ease-in-out infinite;
+  }
+
+  @keyframes twinkle {
+    0%, 100% { opacity: 0.15; transform: scale(0.8); }
+    50% { opacity: 0.8; transform: scale(1.15); }
+  }
+</style>
+</head>
+<body>
+
+<div class="sparkle-layer" id="sparkleLayer"></div>
+
+<h1>⚡ MOLE MASH ⚡</h1>
+<p class="subtitle">✨ Tap the critters before they hide! Watch out for bombs 💣 ✨</p>
+
+<div class="start-screen" id="startScreen">
+  <h2>🎮 Ready to Glow? 🎮</h2>
+  <p>Whack the animals for points, chain hits for glowing combo bonuses, but don't tap the bombs! Speed increases as you level up.</p>
+  <button onclick="startGame()">🚀 Start Game</button>
+</div>
+
+<div id="gameArea" class="hidden">
+  <div class="hud">
+    <div class="hud-box">⏱ <span id="time">30</span>s</div>
+    <div class="hud-box">🏆 <span id="score">0</span></div>
+    <div class="hud-box combo-box" id="comboBox">🔥 x<span id="combo">1</span></div>
+    <div class="hud-box">📶 Lvl <span id="level">1</span></div>
+    <div class="mute-btn" id="muteBtn" onclick="toggleMute()">🔊</div>
+  </div>
+  <div class="level-bar-container">
+    <div class="level-bar" id="levelBar"></div>
+  </div>
+  <div class="board" id="board"></div>
+</div>
+
+<div class="end-screen hidden" id="endScreen">
+  <h2 id="endTitle">🎉 Time's Up! 🎉</h2>
+  <p id="endText">You scored 0 points!</p>
+  <button onclick="startGame()">🔄 Play Again</button>
+</div>
+
+<script>
+  const NUM_HOLES = 9;
+  const GAME_TIME = 30;
+  const GOOD_CRITTERS = ['🐰','🦊','🐨','🐯'];
+  const BOMB = '💣';
+  const GOLD_CRITTER = '🌟';
+
+  let holes = [];
+  let score = 0;
+  let combo = 1;
+  let timeLeft = GAME_TIME;
+  let level = 1;
+  let xp = 0;
+  let xpToNext = 5;
+  let spawnTimer = null;
+  let countdownTimer = null;
+  let activeHoles = new Set();
+  let gameRunning = false;
+  let muted = false;
+
+  const board = document.getElementById('board');
+  const scoreEl = document.getElementById('score');
+  const comboEl = document.getElementById('combo');
+  const comboBox = document.getElementById('comboBox');
+  const timeEl = document.getElementById('time');
+  const levelEl = document.getElementById('level');
+  const levelBar = document.getElementById('levelBar');
+  const startScreen = document.getElementById('startScreen');
+  const gameArea = document.getElementById('gameArea');
+  const endScreen = document.getElementById('endScreen');
+  const endTitle = document.getElementById('endTitle');
+  const endText = document.getElementById('endText');
+  const sparkleLayer = document.getElementById('sparkleLayer');
+  const muteBtn = document.getElementById('muteBtn');
+
+  // ---- Sound (generated live, no files/no copyright) ----
+  let audioCtx = null;
+  function getAudioCtx() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    return audioCtx;
+  }
+  function playTone(freq, duration, type = 'sine', volume = 0.15) {
+    if (muted) return;
+    try {
+      const ctx = getAudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, ctx.currentTime);
+      gain.gain.setValueAtTime(volume, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + duration);
+    } catch (e) { /* audio not available, ignore */ }
+  }
+  function sfxHit() { playTone(700, 0.12, 'square', 0.12); }
+  function sfxGold() { playTone(1000, 0.18, 'triangle', 0.15); setTimeout(() => playTone(1300, 0.15, 'triangle', 0.12), 80); }
+  function sfxBomb() { playTone(120, 0.3, 'sawtooth', 0.18); }
+  function sfxLevelUp() { playTone(600, 0.1, 'square', 0.12); setTimeout(() => playTone(900, 0.15, 'square', 0.12), 100); }
+  function sfxWin() { [523,659,784,1047].forEach((f, i) => setTimeout(() => playTone(f, 0.2, 'triangle', 0.14), i * 120)); }
+
+  function toggleMute() {
+    muted = !muted;
+    muteBtn.textContent = muted ? '🔇' : '🔊';
+  }
+
+  function makeSparkles() {
+    sparkleLayer.innerHTML = '';
+    const glyphs = ['✨','⭐'];
+    for (let i = 0; i < 12; i++) {
+      const s = document.createElement('div');
+      s.className = 'sparkle';
+      s.textContent = glyphs[Math.floor(Math.random() * glyphs.length)];
+      s.style.left = Math.random() * 100 + 'vw';
+      s.style.top = Math.random() * 100 + 'vh';
+      s.style.animationDelay = (Math.random() * 2) + 's';
+      sparkleLayer.appendChild(s);
+    }
+  }
+
+  function buildBoard() {
+    board.innerHTML = '';
+    holes = [];
+    for (let i = 0; i < NUM_HOLES; i++) {
+      const hole = document.createElement('div');
+      hole.className = 'hole';
+      hole.dataset.index = i;
+      const critter = document.createElement('div');
+      critter.className = 'critter';
+      hole.appendChild(critter);
+      hole.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        whack(hole, i);
+      });
+      board.appendChild(hole);
+      holes.push(hole);
+    }
+  }
+
+  function randomHole() {
+    const emptyHoles = holes.filter((h, i) => !activeHoles.has(i));
+    if (emptyHoles.length === 0) return null;
+    return emptyHoles[Math.floor(Math.random() * emptyHoles.length)];
+  }
+
+  function pickCritter() {
+    const roll = Math.random();
+    if (roll < 0.12) return BOMB;
+    if (roll < 0.20) return GOLD_CRITTER;
+    return GOOD_CRITTERS[Math.floor(Math.random() * GOOD_CRITTERS.length)];
+  }
+
+  function spawnCritter() {
+    if (!gameRunning) return;
+    const hole = randomHole();
+    if (!hole) return;
+    const index = parseInt(hole.dataset.index);
+
+    // clear any leftover visual clutter from a previous round in this hole
+    hole.querySelectorAll('.burst, .score-pop').forEach(el => el.remove());
+    hole.classList.remove('hit');
+
+    const critterEl = hole.querySelector('.critter');
+    const type = pickCritter();
+    critterEl.textContent = type;
+    hole.dataset.type = type;
+    hole.classList.add('up');
+    activeHoles.add(index);
+
+    const upDuration = Math.max(600, 1150 - (level * 55));
+    const hideTimeout = setTimeout(() => {
+      hole.classList.remove('up');
+      activeHoles.delete(index);
+      if (type !== BOMB) {
+        combo = 1;
+        updateCombo();
+      }
+    }, upDuration);
+    hole._hideTimeout = hideTimeout;
+  }
+
+  function spawnBurst(hole, color) {
+    for (let i = 0; i < 6; i++) {
+      const b = document.createElement('div');
+      b.className = 'burst';
+      b.style.background = color;
+      const angle = (Math.PI * 2 * i) / 6;
+      const dist = 34 + Math.random() * 14;
+      b.style.setProperty('--dx', Math.cos(angle) * dist + 'px');
+      b.style.setProperty('--dy', Math.sin(angle) * dist + 'px');
+      hole.appendChild(b);
+      setTimeout(() => b.remove(), 420);
+    }
+  }
+
+  function screenShake() {
+    document.body.classList.add('shake');
+    setTimeout(() => document.body.classList.remove('shake'), 250);
+  }
+
+  function whack(hole, index) {
+    if (!gameRunning) return;
+    if (!hole.classList.contains('up') || hole.classList.contains('hit')) return;
+
+    clearTimeout(hole._hideTimeout);
+    const type = hole.dataset.type;
+    hole.classList.remove('up');
+    hole.classList.add('hit');
+    activeHoles.delete(index);
+
+    let points = 0;
+    if (type === BOMB) {
+      points = -5;
+      combo = 1;
+      flashScore(hole, '💥 -5', '#FF3355');
+      spawnBurst(hole, '#FF3355');
+      screenShake();
+      sfxBomb();
+    } else if (type === GOLD_CRITTER) {
+      points = 5 * combo;
+      combo++;
+      addXP(2);
+      flashScore(hole, `+${points}`, '#FFD700');
+      spawnBurst(hole, '#FFD700');
+      sfxGold();
+    } else {
+      points = 1 * combo;
+      combo++;
+      addXP(1);
+      flashScore(hole, `+${points}`, '#00E5FF');
+      spawnBurst(hole, '#00E5FF');
+      sfxHit();
+    }
+
+    score = Math.max(0, score + points);
+    scoreEl.textContent = score;
+    updateCombo();
+
+    setTimeout(() => {
+      hole.classList.remove('hit');
+    }, 260);
+  }
+
+  function flashScore(hole, text, color) {
+    const pop = document.createElement('div');
+    pop.className = 'score-pop';
+    pop.textContent = text;
+    pop.style.color = color;
+    pop.style.textShadow = `0 0 8px ${color}`;
+    hole.appendChild(pop);
+    setTimeout(() => pop.remove(), 600);
+  }
+
+  function updateCombo() {
+    comboEl.textContent = combo;
+    comboBox.classList.add('pulse');
+    setTimeout(() => comboBox.classList.remove('pulse'), 150);
+  }
+
+  function addXP(amount) {
+    xp += amount;
+    if (xp >= xpToNext) {
+      xp = 0;
+      level++;
+      xpToNext = 5 + level * 2;
+      levelEl.textContent = level;
+      sfxLevelUp();
+    }
+    levelBar.style.width = Math.min(100, (xp / xpToNext) * 100) + '%';
+  }
+
+  function gameTick() {
+    timeLeft--;
+    timeEl.textContent = timeLeft;
+    if (timeLeft <= 0) {
+      endGame();
+    }
+  }
+
+  function scheduleSpawns() {
+    if (!gameRunning) return;
+    const interval = Math.max(450, 1000 - (level * 45));
+    spawnCritter();
+    spawnTimer = setTimeout(scheduleSpawns, interval);
+  }
+
+  function startGame() {
+    getAudioCtx(); // unlock audio on user gesture
+
+    score = 0;
+    combo = 1;
+    timeLeft = GAME_TIME;
+    level = 1;
+    xp = 0;
+    xpToNext = 5;
+    activeHoles = new Set();
+    gameRunning = true;
+
+    scoreEl.textContent = score;
+    comboEl.textContent = combo;
+    timeEl.textContent = timeLeft;
+    levelEl.textContent = level;
+    levelBar.style.width = '0%';
+
+    startScreen.classList.add('hidden');
+    endScreen.classList.add('hidden');
+    gameArea.classList.remove('hidden');
+
+    buildBoard();
+    clearInterval(countdownTimer);
+    clearTimeout(spawnTimer);
+    countdownTimer = setInterval(gameTick, 1000);
+    scheduleSpawns();
+  }
+
+  function endGame() {
+    gameRunning = false;
+    clearInterval(countdownTimer);
+    clearTimeout(spawnTimer);
+    holes.forEach(h => {
+      clearTimeout(h._hideTimeout);
+      h.classList.remove('up', 'hit');
+    });
+
+    gameArea.classList.add('hidden');
+    endScreen.classList.remove('hidden');
+
+    let msg = `You scored ${score} points and reached Level ${level}!`;
+    if (score >= 60) {
+      endTitle.textContent = '🏆 LEGENDARY! 🏆';
+      launchConfetti();
+      sfxWin();
+    } else if (score >= 30) {
+      endTitle.textContent = '🎉 Great Job! 🎉';
+    } else {
+      endTitle.textContent = '👍 Nice Try! 👍';
+    }
+    endText.textContent = msg;
+  }
+
+  function launchConfetti() {
+    const emojiSet = ['🎉','🎊','⭐','🌟','🏆'];
+    for (let i = 0; i < 26; i++) {
+      setTimeout(() => {
+        const conf = document.createElement('div');
+        conf.className = 'confetti';
+        conf.textContent = emojiSet[Math.floor(Math.random() * emojiSet.length)];
+        conf.style.left = Math.random() * 100 + 'vw';
+        conf.style.animationDuration = (2 + Math.random() * 2) + 's';
+        document.body.appendChild(conf);
+        setTimeout(() => conf.remove(), 4000);
+      }, i * 55);
+    }
+  }
+
+  makeSparkles();
+  buildBoard();
+</script>
+
+</body>
+</html>
